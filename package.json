@@ -5,6 +5,7 @@
     "author": "Fabian Scheidt",
     "license": "MIT",
     "dependencies": {
+        "hap-nodejs": "^0.9.5",
         "serialport": "^9.2.1"
     },
     "devDependencies": {

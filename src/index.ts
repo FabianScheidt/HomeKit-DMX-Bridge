@@ -1,70 +1,105 @@
 import SerialPort from 'serialport';
+import { Accessory, Categories, Characteristic, CharacteristicEventTypes, Service, uuid } from 'hap-nodejs';
+import { WithUUID } from 'hap-nodejs/dist/types';
+import { hslToRgb } from './hsl-to-rgb';
 
 const START_OF_MESSAGE_DELIMITER = 0x7e;
 const SEND_DMX_PACKET_REQUEST_LABEL = 6;
 const END_OF_MESSAGE_DELIMITER = 0xe7;
 
-async function findAndConnectEnttecDevice(): Promise<SerialPort> {
-    const ports = await SerialPort.list();
-    const enttecPorts = ports.filter((p) => p.manufacturer?.toUpperCase() === 'ENTTEC');
+class HapToDmxMapper {
+    protected light?: Service;
+    protected accessory?: Accessory;
+    protected serial?: SerialPort;
 
-    if (enttecPorts.length === 0) {
-        throw new Error('There is no serial port with manufacturer ENTTEC. Aborting!');
+    protected on = false;
+    protected brightness = 100;
+    protected hue = 0;
+    protected saturation = 0;
+
+    public async initialize() {
+        await this.initializeSerial();
+        this.initializeLight();
+        this.initializeAccessory();
     }
-    if (enttecPorts.length > 1) {
-        console.warn('It appears that more than one ENTTEC device is connected. Using the first one...');
+
+    protected async initializeSerial() {
+        const ports = await SerialPort.list();
+        const enttecPorts = ports.filter((p) => p.manufacturer?.toUpperCase() === 'ENTTEC');
+
+        if (enttecPorts.length === 0) {
+            throw new Error('There is no serial port with manufacturer ENTTEC. Aborting!');
+        }
+        if (enttecPorts.length > 1) {
+            console.warn('It appears that more than one ENTTEC device is connected. Using the first one...');
+        }
+
+        console.log('Using ENTTEC device with serial number ' + enttecPorts[0].serialNumber);
+        const path = enttecPorts[0].path;
+        this.serial = new SerialPort(path);
+        this.sendSerial();
     }
 
-    console.log('Using ENTTEC device with serial number ' + enttecPorts[0].serialNumber);
-    const path = enttecPorts[0].path;
-    return new SerialPort(path);
+    protected initializeLight() {
+        this.light = new Service.Lightbulb('LED Bar');
+
+        const addCharacteristic = (
+            constructor: WithUUID<{ new (): Characteristic }>,
+            property: 'on' | 'brightness' | 'hue' | 'saturation',
+        ) => {
+            const characteristic = this.light?.getCharacteristic(constructor);
+            characteristic?.on(CharacteristicEventTypes.GET, (callback) => {
+                callback(undefined, this[property]);
+            });
+            characteristic?.on(CharacteristicEventTypes.SET, (value, callback) => {
+                this[property] = value as never;
+                this.sendSerial();
+                callback();
+            });
+        };
+
+        addCharacteristic(Characteristic.On, 'on');
+        addCharacteristic(Characteristic.Brightness, 'brightness');
+        addCharacteristic(Characteristic.Hue, 'hue');
+        addCharacteristic(Characteristic.Saturation, 'saturation');
+    }
+
+    protected initializeAccessory() {
+        const accessoryUuid = uuid.generate('com.fabian-scheidt.hap-dmx');
+        this.accessory = new Accessory('HAP-DMX LED-Bar', accessoryUuid);
+        this.accessory.addService(this.light!);
+
+        this.accessory.publish({
+            username: '46:f8:33:74:ff:30',
+            pincode: '211-51-758',
+            category: Categories.LIGHTBULB,
+        });
+    }
+
+    protected sendSerialMessage(label: number, data: number[], callback?: (error: Error | null | undefined, bytesWritten: number) => void) {
+        const lengthLsb = data.length & 0xff;
+        const lengthMsb = data.length >> 8;
+
+        this.serial?.write([START_OF_MESSAGE_DELIMITER, label, lengthLsb, lengthMsb, ...data, END_OF_MESSAGE_DELIMITER], callback);
+    }
+
+    protected sendSerial() {
+        const [r, g, b] = hslToRgb(this.hue / 360, this.saturation / 100, 0.5);
+        const dmxValues = Array(513).fill(0);
+
+        // LightmaXX LED Color Bar
+        dmxValues[1] = 30;
+        dmxValues[2] = this.on ? Math.round((this.brightness / 100) * 255) : 0;
+        dmxValues[3] = 0;
+        dmxValues[4] = r;
+        dmxValues[5] = g;
+        dmxValues[6] = b;
+
+        this.sendSerialMessage(SEND_DMX_PACKET_REQUEST_LABEL, dmxValues);
+    }
 }
 
-function sendMessage(
-    serial: SerialPort,
-    label: number,
-    data: number[],
-    callback?: (error: Error | null | undefined, bytesWritten: number) => void,
-): void {
-    const lengthLsb = data.length & 0xff;
-    const lengthMsb = data.length >> 8;
-
-    serial.write([START_OF_MESSAGE_DELIMITER, label, lengthLsb, lengthMsb, ...data, END_OF_MESSAGE_DELIMITER], callback);
+if (require.main === module) {
+    const mapper = new HapToDmxMapper();
+    mapper.initialize();
 }
-
-let offfset = 0;
-function doExample(serial: SerialPort) {
-    offfset++;
-    offfset = offfset > 255 ? 0 : offfset;
-
-    const dmxValues = Array(513).fill(0);
-
-    // LightmaXX LED Color Bar
-
-    // Setup
-    dmxValues[0] = 0;
-    dmxValues[1] = 12;
-    dmxValues[2] = 255;
-    dmxValues[3] = 0;
-
-    // RGB 1
-    dmxValues[4] = offfset;
-    dmxValues[5] = 255 - offfset;
-    dmxValues[6] = 0;
-
-    // RGB 2
-    dmxValues[7] = 0;
-    dmxValues[8] = offfset;
-    dmxValues[9] = 255 - offfset;
-
-    // RGB 3
-    dmxValues[10] = 255 - offfset;
-    dmxValues[11] = 0;
-    dmxValues[12] = offfset;
-
-    sendMessage(serial, SEND_DMX_PACKET_REQUEST_LABEL, dmxValues);
-}
-
-findAndConnectEnttecDevice().then((serial) => {
-    setInterval(() => doExample(serial), 10);
-});
