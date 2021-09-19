@@ -25,16 +25,20 @@ class HapToDmxMapper {
 
     protected async initializeSerial() {
         const ports = await SerialPort.list();
-        const enttecPorts = ports.filter((p) => p.manufacturer?.toUpperCase() === 'ENTTEC');
+        let enttecPorts = ports.filter((p) => p.manufacturer?.toUpperCase() === 'ENTTEC');
 
         if (enttecPorts.length === 0) {
-            throw new Error('There is no serial port with manufacturer ENTTEC. Aborting!');
+            console.warn('There is no serial port with manufacturer ENTTEC. Attempting to guess the correct port...');
+            enttecPorts = ports.filter((p) => p.path?.toUpperCase().indexOf('USB') > -1);
+            if (enttecPorts.length === 0) {
+                throw new Error('There is no matching serial port. Aborting!');
+            }
         }
         if (enttecPorts.length > 1) {
-            console.warn('It appears that more than one ENTTEC device is connected. Using the first one...');
+            console.warn('It appears that more than one device is connected. Using the first one...');
         }
 
-        console.log('Using ENTTEC device with serial number ' + enttecPorts[0].serialNumber);
+        console.log('Using device with serial number ' + enttecPorts[0].serialNumber);
         const path = enttecPorts[0].path;
         this.serial = new SerialPort(path);
         this.sendSerial();
