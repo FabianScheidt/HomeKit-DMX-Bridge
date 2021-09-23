@@ -1,7 +1,7 @@
 import SerialPort from 'serialport';
 import { Accessory, Categories, Characteristic, CharacteristicEventTypes, Service, uuid } from 'hap-nodejs';
 import { WithUUID } from 'hap-nodejs/dist/types';
-import { hslToRgb } from './hsl-to-rgb';
+import * as colorConvert from 'color-convert';
 
 const START_OF_MESSAGE_DELIMITER = 0x7e;
 const SEND_DMX_PACKET_REQUEST_LABEL = 6;
@@ -88,7 +88,7 @@ class HapToDmxMapper {
     }
 
     protected sendSerial() {
-        const [r, g, b] = hslToRgb(this.hue / 360, this.saturation / 100, 0.5);
+        const [r, g, b] = colorConvert.hsv.rgb([this.hue, this.saturation, 100]);
         const dmxValues = Array(513).fill(0);
 
         // LightmaXX LED Color Bar

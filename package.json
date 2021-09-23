@@ -5,10 +5,12 @@
     "author": "Fabian Scheidt",
     "license": "MIT",
     "dependencies": {
+        "color-convert": "^2.0.1",
         "hap-nodejs": "^0.9.5",
         "serialport": "^9.2.1"
     },
     "devDependencies": {
+        "@types/color-convert": "^2.0.0",
         "@types/node": "^16.9.3",
         "@types/serialport": "^8.0.2",
         "ts-node": "^10.2.1",
