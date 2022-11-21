@@ -20,6 +20,14 @@ export abstract class Fixture<FixtureProperties extends { [property: string]: Ch
         });
     }
 
+    protected toDmxValue(value: number, min: number, max: number): [number, number] {
+        const scaled = (value - min) / (max - min);
+        const upscaled = Math.trunc(scaled * 65535);
+        const coarse = Math.floor(upscaled / 256);
+        const fine = upscaled % 256;
+        return [coarse, fine];
+    }
+
     public getDmxValues(): number[] {
         return Array(513).fill(0);
     }

@@ -28,7 +28,7 @@ export class LightmaxxLedBar extends Fixture<LightmaxxLedBarProperties> {
 
     public getDmxValues(): number[] {
         const [r, g, b] = colorConvert.hsv.rgb([this.properties.hue, this.properties.saturation, 100]);
-        const brightness = Math.round((this.properties.brightness / 100) * 255);
+        const [brightness, _] = this.toDmxValue(this.properties.brightness, 0, 100);
 
         const dmxValues = super.getDmxValues();
         dmxValues[this.channel] = 30;
