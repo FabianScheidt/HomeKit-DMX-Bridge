@@ -4,6 +4,7 @@ import { LightmaxxLedBar } from './fixtures/lightmaxx-led-bar';
 import { Fixture } from './fixture';
 
 const START_OF_MESSAGE_DELIMITER = 0x7e;
+const GET_WIDGET_PARAMETER_REQUEST_LABEL = 3;
 const SEND_DMX_PACKET_REQUEST_LABEL = 6;
 const END_OF_MESSAGE_DELIMITER = 0xe7;
 
@@ -35,14 +36,31 @@ class HapToDmxMapper {
 
         console.log('Using device with serial number ' + enttecPorts[0].serialNumber);
         const path = enttecPorts[0].path;
-        this.serial = new SerialPort({ path, baudRate: 115200 });
+
+        await new Promise((resolve, reject) => {
+            this.serial = new SerialPort({ path, baudRate: 115200 }, (err) => {
+                if (err) {
+                    reject(err);
+                } else {
+                    console.log('Connected.');
+                    resolve(void 0);
+                }
+            });
+        });
+
+        console.log('Requesting Parameters...');
+        const parameters = await this.getWidgetParameters();
+        console.log(parameters);
+
+        console.log('Now sending DMX data...');
+        const outputRate = Math.min(parameters.dmxOutputRate, 25);
+        setInterval(() => this.sendDmx(), 1000 / outputRate);
     }
 
     protected initializeAccessory() {
         const accessoryUuid = uuid.generate('com.fabian-scheidt.hap-dmx');
         this.accessory = new Accessory('HAP-DMX LED-Bar', accessoryUuid);
         for (const fixture of this.fixtures) {
-            fixture.changeCallback = () => this.sendSerial();
             this.accessory.addService(fixture.getHapService());
         }
 
@@ -61,7 +79,59 @@ class HapToDmxMapper {
         await this.serial?.port?.write(buffer);
     }
 
-    protected sendSerial(): Promise<void> {
+    protected async readSerialMessage(): Promise<[number, number[]]> {
+        let startByteReceived = false;
+        const message = [];
+        while (true) {
+            if (!this.serial?.port) {
+                throw new Error('Serial Port not set');
+            }
+
+            const readBuffer = Buffer.from([0]);
+            await this.serial.port.read(readBuffer, 0, 1);
+            const readByte = readBuffer[0];
+            if (readByte == START_OF_MESSAGE_DELIMITER) {
+                startByteReceived = true;
+                continue;
+            }
+            if (!startByteReceived) {
+                continue;
+            }
+            if (readByte === END_OF_MESSAGE_DELIMITER) {
+                break;
+            }
+            message.push(readByte);
+        }
+
+        const label = message[0];
+        const length = message[1] + (message[2] << 8);
+        const dataBytes = message.slice(3);
+
+        if (dataBytes.length !== length) {
+            throw new Error('Expected data length to be ' + length + ' but received ' + dataBytes.length);
+        }
+
+        return [label, dataBytes];
+    }
+
+    protected async getWidgetParameters() {
+        await this.serial?.port?.flush();
+        await this.sendSerialMessage(GET_WIDGET_PARAMETER_REQUEST_LABEL, [0, 0]);
+        const [label, dataBytes] = await this.readSerialMessage();
+
+        if (label !== GET_WIDGET_PARAMETER_REQUEST_LABEL) {
+            throw new Error('Expected label to be ' + GET_WIDGET_PARAMETER_REQUEST_LABEL + ' but received' + label);
+        }
+
+        return {
+            firmwareVersion: dataBytes[0] + (dataBytes[1] << 8),
+            dmxOutputBreakTime: dataBytes[2] * 10.67,
+            dmxOutputMarkAfterBreakTime: dataBytes[3] * 10.67,
+            dmxOutputRate: dataBytes[4],
+        };
+    }
+
+    protected sendDmx(): Promise<void> {
         const fixtureDmxValues = this.fixtures.map((f) => f.getDmxValues());
         const dmxValues = Array(513).fill(0);
         for (let i = 0; i <= 512; i++) {

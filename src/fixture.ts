@@ -2,7 +2,7 @@ import { CharacteristicValue, WithUUID } from 'hap-nodejs/dist/types';
 import { Characteristic, CharacteristicEventTypes, Service } from 'hap-nodejs';
 
 export abstract class Fixture<FixtureProperties extends { [property: string]: CharacteristicValue } = {}> {
-    public constructor(public readonly name: string, public readonly channel: number, public changeCallback: () => void = () => {}) {}
+    public constructor(public readonly name: string, public readonly channel: number) {}
 
     protected abstract properties: FixtureProperties;
 
@@ -15,7 +15,6 @@ export abstract class Fixture<FixtureProperties extends { [property: string]: Ch
         });
         characteristic?.on(CharacteristicEventTypes.SET, (value: CharacteristicValue, callback) => {
             this.properties[property] = value as never;
-            this.changeCallback();
             callback();
         });
     }
