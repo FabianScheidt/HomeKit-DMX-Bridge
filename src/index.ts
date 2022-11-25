@@ -2,6 +2,7 @@ import { SerialPort } from 'serialport';
 import { Accessory, Categories, uuid } from 'hap-nodejs';
 import { LightmaxxLedBar } from './fixtures/lightmaxx-led-bar';
 import { Fixture } from './fixture';
+import { EuroliteTmh14 } from './fixtures/eurolite-tmh-14';
 
 const START_OF_MESSAGE_DELIMITER = 0x7e;
 const GET_WIDGET_PARAMETER_REQUEST_LABEL = 3;
@@ -142,6 +143,6 @@ class HapToDmxMapper {
 }
 
 if (require.main === module) {
-    const mapper = new HapToDmxMapper([new LightmaxxLedBar('LED Bar', 1)]);
+    const mapper = new HapToDmxMapper([new LightmaxxLedBar('LED Bar', 1), new EuroliteTmh14('TMH 1', 21), new EuroliteTmh14('TMH 2', 41)]);
     mapper.initialize();
 }
