@@ -1,4 +1,4 @@
-import SerialPort from 'serialport';
+import { SerialPort } from 'serialport';
 import { Accessory, Categories, uuid } from 'hap-nodejs';
 import { LightmaxxLedBar } from './fixtures/lightmaxx-led-bar';
 import { Fixture } from './fixture';
@@ -35,8 +35,7 @@ class HapToDmxMapper {
 
         console.log('Using device with serial number ' + enttecPorts[0].serialNumber);
         const path = enttecPorts[0].path;
-        this.serial = new SerialPort(path);
-        this.sendSerial();
+        this.serial = new SerialPort({ path, baudRate: 115200 });
     }
 
     protected initializeAccessory() {
@@ -54,20 +53,21 @@ class HapToDmxMapper {
         });
     }
 
-    protected sendSerialMessage(label: number, data: number[], callback?: (error: Error | null | undefined, bytesWritten: number) => void) {
+    protected async sendSerialMessage(label: number, data: number[]): Promise<void> {
         const lengthLsb = data.length & 0xff;
         const lengthMsb = data.length >> 8;
+        const buffer = Buffer.from([START_OF_MESSAGE_DELIMITER, label, lengthLsb, lengthMsb, ...data, END_OF_MESSAGE_DELIMITER]);
 
-        this.serial?.write([START_OF_MESSAGE_DELIMITER, label, lengthLsb, lengthMsb, ...data, END_OF_MESSAGE_DELIMITER], callback);
+        await this.serial?.port?.write(buffer);
     }
 
-    protected sendSerial() {
+    protected sendSerial(): Promise<void> {
         const fixtureDmxValues = this.fixtures.map((f) => f.getDmxValues());
         const dmxValues = Array(513).fill(0);
         for (let i = 0; i <= 512; i++) {
             dmxValues[i] = Math.max(...fixtureDmxValues.map((v) => v[i]));
         }
-        this.sendSerialMessage(SEND_DMX_PACKET_REQUEST_LABEL, dmxValues);
+        return this.sendSerialMessage(SEND_DMX_PACKET_REQUEST_LABEL, dmxValues);
     }
 }
 
