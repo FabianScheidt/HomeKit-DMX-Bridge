@@ -1,4 +1,4 @@
-FROM node:lts
+FROM node:16-stretch
 
 RUN apt-get update && apt-get install -y udev
 
