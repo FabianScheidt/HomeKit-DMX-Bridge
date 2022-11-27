@@ -59,14 +59,14 @@ class HapToDmxMapper {
     }
 
     protected initializeAccessory() {
-        const accessoryUuid = uuid.generate('com.fabian-scheidt.hap-dmx');
-        this.accessory = new Accessory('HAP-DMX LED-Bar', accessoryUuid);
+        const accessoryUuid = uuid.generate('com.fabian-scheidt.hap-dmx-bridge');
+        this.accessory = new Accessory('HAP-DMX Bridge', accessoryUuid);
         for (const fixture of this.fixtures) {
             this.accessory.addService(fixture.getHapService());
         }
 
         this.accessory.publish({
-            username: '46:f8:33:74:ff:30',
+            username: '44:f8:33:74:ff:30',
             pincode: '211-51-758',
             category: Categories.LIGHTBULB,
         });
