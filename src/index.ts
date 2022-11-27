@@ -143,6 +143,12 @@ class HapToDmxMapper {
 }
 
 if (require.main === module) {
-    const mapper = new HapToDmxMapper([new LightmaxxLedBar('LED Bar', 1), new EuroliteTmh14('TMH 1', 21), new EuroliteTmh14('TMH 2', 41)]);
+    const mapper = new HapToDmxMapper([
+        new LightmaxxLedBar('LED Bar', 1),
+        new EuroliteTmh14('TMH 1', 21),
+        new EuroliteTmh14('TMH 2', 41),
+        new EuroliteTmh14('TMH 3', 61),
+        new EuroliteTmh14('TMH 4', 81),
+    ]);
     mapper.initialize();
 }
